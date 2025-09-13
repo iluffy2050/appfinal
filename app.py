@@ -1,10 +1,10 @@
-import os
-from flask import Flask, render_template
-from flask_socketio import SocketIO, emit
-from flask import request
+import eventlet
+eventlet.monkey_patch()  # MUST be first
 
-# Tell Flask to look for templates in the same folder as app.py
-app = Flask(__name__, template_folder=os.path.dirname(os.path.abspath(__file__)))
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, emit
+
+app = Flask(__name__, template_folder='.')
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
@@ -12,9 +12,10 @@ users = {}
 
 @app.route('/')
 def index():
-    return render_template('index.html')  # Will now find index.html in same folder
+    return render_template('index.html')
 
-# The rest of your SocketIO code stays the same...
+# ... rest of your SocketIO handlers ...
+
 @socketio.on('join')
 def handle_join(data):
     username = data['username']
@@ -43,3 +44,4 @@ def handle_disconnect():
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
+
