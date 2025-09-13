@@ -37,7 +37,7 @@ function joinChat() {
     const pfp = document.getElementById('pfp').value;
     if (!username) return alert("Enter a username");
 
-    socket = io();
+    socket = io(); // Connect to server
 
     socket.on('connect', () => {
         socket.emit('join', {username, pfp});
