@@ -1,45 +1,62 @@
-from flask import Flask, render_template, request, jsonify
-import time
+from flask import Flask, render_template, request
+from flask_socketio import SocketIO, emit
+import eventlet
+eventlet.monkey_patch()
 
-app = Flask(__name__, template_folder='.')
+app = Flask(__name__, template_folder=".")
+app.config["SECRET_KEY"] = "secret!"
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
-messages = []   # [{username, pfp, message, seen_by}]
-typing_user = None
+users = {}  # { sid: {username, pfp} }
+messages = []
 
-@app.route('/')
+
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/send_message', methods=['POST'])
-def send_message():
-    data=request.get_json()
-    msg={
-        "username":data['username'],
-        "pfp":data['pfp'],
-        "message":data['message'],
-        "seen_by": None,
-        "timestamp": time.time()
+
+@socketio.on("join")
+def handle_join(data):
+    username = data.get("username")
+    pfp = data.get("pfp", "/static/default.png")
+    users[request.sid] = {"username": username, "pfp": pfp}
+
+    emit("user_joined", {"username": username}, broadcast=True)
+
+
+@socketio.on("send_message")
+def handle_message(data):
+    user = users.get(request.sid, {"username": "Anonymous", "pfp": "/static/default.png"})
+    message = {
+        "username": user["username"],
+        "pfp": user["pfp"],
+        "text": data.get("message", ""),
     }
-    messages.append(msg)
-    return {"status":"ok"}
+    messages.append(message)
+    emit("receive_message", message, broadcast=True)
 
-@app.route('/get_messages', methods=['POST'])
-def get_messages():
-    global typing_user
-    data=request.get_json()
-    user=data['username']
-    # mark last message as seen by this user
-    if messages:
-        messages[-1]["seen_by"]=user
-    return jsonify({"messages":messages,"typing":typing_user})
 
-@app.route('/typing', methods=['POST'])
-def typing():
-    global typing_user
-    data=request.get_json()
-    typing_user=data['username']
-    return {"status":"ok"}
+@socketio.on("typing")
+def handle_typing():
+    user = users.get(request.sid)
+    if user:
+        emit("user_typing", {"username": user["username"]}, broadcast=True, include_self=False)
 
-if __name__=="__main__":
-    app.run(host="0.0.0.0", port=5000)
 
+@socketio.on("seen")
+def handle_seen():
+    user = users.get(request.sid)
+    if user:
+        emit("seen_message", {"username": user["username"]}, broadcast=True, include_self=False)
+
+
+@socketio.on("disconnect")
+def handle_disconnect():
+    user = users.pop(request.sid, None)
+    if user:
+        emit("user_left", {"username": user["username"]}, broadcast=True)
+
+
+if __name__ == "__main__":
+    socketio.run(app, host="0.0.0.0", port=5000)
