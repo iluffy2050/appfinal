@@ -1,19 +1,19 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
-import eventlet
-eventlet.monkey_patch()
 
 app = Flask(__name__, template_folder=".")
 app.config["SECRET_KEY"] = "secret!"
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")  # 👈 changed from eventlet
 
-users = {}  # { sid: {username, pfp} }
+users = {}
 messages = []
-
 
 @app.route("/")
 def index():
     return render_template("index.html")
+
+# same handlers as before (join, send_message, typing, seen, disconnect)...
+
 
 
 @socketio.on("join")
@@ -60,3 +60,4 @@ def handle_disconnect():
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
+
