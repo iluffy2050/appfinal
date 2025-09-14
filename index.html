@@ -1,102 +1,123 @@
-<input type="text" id="username" placeholder="Your name">
-<input type="text" id="pfp" placeholder="Profile picture URL">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Global Chat</title>
+<style>
+body { font-family: Arial, sans-serif; background:#1e1e1e; color:white; }
+#chat { border: 1px solid #555; height: 400px; overflow-y: scroll; padding: 10px; background:#2a2a2a; }
+.message { margin: 5px 0; }
+.username { font-weight: bold; }
+.pfp { width: 30px; height: 30px; border-radius: 50%; vertical-align: middle; margin-right: 5px; }
+#typing { font-style: italic; color: lightgray; margin-top:5px; }
+input, button { padding:6px; margin:4px; }
+</style>
+</head>
+<body>
+
+<h2>Global Chat</h2>
+<div>
+    Username: <input type="text" id="username" placeholder="Your name">
+    PFP URL: <input type="text" id="pfp" placeholder="Profile picture URL">
+    <button onclick="joinChat()">Join</button>
+</div>
 
 <div id="chat"></div>
 <div id="typing"></div>
 
-<input type="text" id="message" placeholder="Type a message..." oninput="sendTyping()">
+<input type="text" id="message" placeholder="Type a message...">
 <button onclick="sendMessage()">Send</button>
 
 <script>
+let username="", pfp="";
+let lastMessageCount=0;
+let typingTimeout;
+
 function requestNotificationPermission() {
     if (Notification.permission !== "granted") {
         Notification.requestPermission();
     }
 }
-let username = '';
-let pfp = '';
 
-document.getElementById('username').addEventListener('change', ()=> {
-    username = document.getElementById('username').value;
-    pfp = document.getElementById('pfp').value;
+function joinChat(){
+    username=document.getElementById('username').value.trim();
+    pfp=document.getElementById('pfp').value.trim();
+    if(!username) return alert("Enter a username");
     requestNotificationPermission();
-});
+    pollMessages();
+    setInterval(pollMessages,1000);
 
-
-function sendMessage(){
-    const msg = document.getElementById('message').value;
-    if(!username||!msg) return;
-    fetch('/send', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({username, pfp, message:msg})
+    // typing listener
+    document.getElementById('message').addEventListener('input', ()=>{
+        fetch('/typing', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({username})
+        });
     });
-    document.getElementById('message').value='';
+
+    // enter to send
+    document.getElementById('message').addEventListener('keypress', function(e){
+        if(e.key==="Enter"){
+            e.preventDefault();
+            sendMessage();
+        }
+    });
 }
 
-// Send typing info
-function sendTyping(){
+async function pollMessages(){
     if(!username) return;
-    fetch('/typing', {
+    const res=await fetch('/get_messages',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({username})
     });
-}
-
-// Poll messages
-
-let lastMessageCount = 0;
-
-async function fetchMessages(){
-    if(!username) return;
-    const res = await fetch('/get_messages', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({username})
-    });
-    const data = await res.json();
-    const chat = document.getElementById('chat');
+    const data=await res.json();
+    const chat=document.getElementById('chat');
     chat.innerHTML='';
-    data.forEach(msg=>{
+    data.messages.forEach(msg=>{
         const div=document.createElement('div');
         div.className='message';
-        let seen = msg.seen_count>1? ` (Seen by ${msg.seen_count})` : '';
+        let seen=msg.seen_by && msg.seen_by!==msg.username ? ` <em>(Seen by ${msg.seen_by})</em>` : '';
         div.innerHTML=`<img src="${msg.pfp}" class="pfp">${msg.username}: ${msg.message}${seen}`;
         chat.appendChild(div);
     });
     chat.scrollTop=chat.scrollHeight;
 
-    // Check for new messages to trigger notification
-    if (data.length > lastMessageCount) {
-        const newMsgs = data.slice(lastMessageCount);
-        newMsgs.forEach(msg => {
-            if (msg.username !== username && Notification.permission === "granted") {
-                new Notification(`New message from ${msg.username}`, {
-                    body: msg.message,
-                    icon: msg.pfp || ''
+    // notifications
+    if(data.messages.length > lastMessageCount){
+        const newMsgs = data.messages.slice(lastMessageCount);
+        newMsgs.forEach(m=>{
+            if(m.username!==username && Notification.permission==="granted"){
+                new Notification(`New message from ${m.username}`,{
+                    body:m.message,
+                    icon:m.pfp || ''
                 });
             }
         });
-        // Update tab title with +N
-        document.title = `(+${data.length - lastMessageCount}) Global Chat`;
+        document.title=`(+${data.messages.length-lastMessageCount}) Global Chat`;
     }
-    lastMessageCount = data.length;
-}
-window.addEventListener('focus', ()=>{
-    document.title = 'Global Chat';
-});
+    lastMessageCount=data.messages.length;
 
-
-// Poll typing
-async function fetchTyping(){
-    const res = await fetch('/get_typing');
-    const users = await res.json();
-    const typingDiv = document.getElementById('typing');
-    typingDiv.innerText = users.length ? users.join(', ')+' is typing...' : '';
+    // typing indicator
+    document.getElementById('typing').innerText = data.typing && data.typing!==username
+        ? `${data.typing} is typing...` : '';
 }
 
-// Poll every second
-setInterval(fetchMessages,1000);
-setInterval(fetchTyping,1000);
+async function sendMessage(){
+    const msg=document.getElementById('message').value.trim();
+    if(!msg || !username) return;
+    await fetch('/send_message',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username,pfp,message:msg})
+    });
+    document.getElementById('message').value="";
+    pollMessages();
+}
+
+window.addEventListener('focus', ()=>{ document.title="Global Chat"; });
 </script>
+
+</body>
+</html>
