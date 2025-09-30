@@ -1,15 +1,11 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
-import eventlet
-
-# Patch sockets early for Eventlet
-eventlet.monkey_patch()
 
 app = Flask(__name__, template_folder=".")
 app.config["SECRET_KEY"] = "secret!"
 
-# Let SocketIO auto-detect Eventlet
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+# Use Gevent instead of Eventlet
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
 
 users = {}
 messages = []
@@ -18,8 +14,7 @@ messages = []
 def index():
     return render_template("index.html")
 
-# --- SocketIO handlers ---
-
+# --- SocketIO handlers (same as before) ---
 @socketio.on("join")
 def handle_join(data):
     username = data.get("username")
@@ -56,7 +51,5 @@ def handle_disconnect():
     if user:
         emit("user_left", {"username": user["username"]}, broadcast=True)
 
-# --- Run the app ---
 if __name__ == "__main__":
-    # Use Eventlet WSGI server
     socketio.run(app, host="0.0.0.0", port=5000)
