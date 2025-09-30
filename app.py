@@ -3,9 +3,7 @@ from flask_socketio import SocketIO, emit
 
 app = Flask(__name__, template_folder=".")
 app.config["SECRET_KEY"] = "secret!"
-
-# <-- THREADING MODE: compatible with Python 3.13
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")  # force threading
 
 users = {}
 messages = []
@@ -14,7 +12,6 @@ messages = []
 def index():
     return render_template("index.html")
 
-# --- SocketIO handlers (unchanged) ---
 @socketio.on("join")
 def handle_join(data):
     username = data.get("username")
