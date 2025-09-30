@@ -1,9 +1,15 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
+import eventlet
+
+# Patch sockets early for Eventlet
+eventlet.monkey_patch()
 
 app = Flask(__name__, template_folder=".")
 app.config["SECRET_KEY"] = "secret!"
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")  # 👈 changed from eventlet
+
+# Let SocketIO auto-detect Eventlet
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 users = {}
 messages = []
@@ -12,18 +18,14 @@ messages = []
 def index():
     return render_template("index.html")
 
-# same handlers as before (join, send_message, typing, seen, disconnect)...
-
-
+# --- SocketIO handlers ---
 
 @socketio.on("join")
 def handle_join(data):
     username = data.get("username")
     pfp = data.get("pfp", "https://cdn-icons-png.flaticon.com/512/149/149071.png")
     users[request.sid] = {"username": username, "pfp": pfp}
-
     emit("user_joined", {"username": username}, broadcast=True)
-
 
 @socketio.on("send_message")
 def handle_message(data):
@@ -36,13 +38,11 @@ def handle_message(data):
     messages.append(message)
     emit("receive_message", message, broadcast=True)
 
-
 @socketio.on("typing")
 def handle_typing():
     user = users.get(request.sid)
     if user:
         emit("user_typing", {"username": user["username"]}, broadcast=True, include_self=False)
-
 
 @socketio.on("seen")
 def handle_seen():
@@ -50,15 +50,13 @@ def handle_seen():
     if user:
         emit("seen_message", {"username": user["username"]}, broadcast=True, include_self=False)
 
-
 @socketio.on("disconnect")
 def handle_disconnect():
     user = users.pop(request.sid, None)
     if user:
         emit("user_left", {"username": user["username"]}, broadcast=True)
 
-
+# --- Run the app ---
 if __name__ == "__main__":
+    # Use Eventlet WSGI server
     socketio.run(app, host="0.0.0.0", port=5000)
-
-
