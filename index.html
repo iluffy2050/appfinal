@@ -136,8 +136,12 @@ function joinChat() {
   const pfp = document.getElementById('pfp').value || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
   if (!myUsername) return alert("Enter a username");
 
-  socket = io({transports: ['polling']});
-
+  socket = io({
+    transports: ['polling'],
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
+});
 
   socket.on('connect', () => {
     socket.emit('join', {username: myUsername, pfp: pfp});
@@ -200,4 +204,5 @@ function checkEnter(e) {
 
 </body>
 </html>
+
 
