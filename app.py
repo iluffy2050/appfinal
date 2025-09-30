@@ -4,8 +4,8 @@ from flask_socketio import SocketIO, emit
 app = Flask(__name__, template_folder=".")
 app.config["SECRET_KEY"] = "secret!"
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
-
+# <-- THREADING MODE: compatible with Python 3.13
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 users = {}
 messages = []
@@ -14,7 +14,7 @@ messages = []
 def index():
     return render_template("index.html")
 
-# --- SocketIO handlers (same as before) ---
+# --- SocketIO handlers (unchanged) ---
 @socketio.on("join")
 def handle_join(data):
     username = data.get("username")
@@ -53,4 +53,3 @@ def handle_disconnect():
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
-
