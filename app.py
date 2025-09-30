@@ -3,7 +3,7 @@ from flask_socketio import SocketIO, emit
 
 app = Flask(__name__, template_folder=".")
 app.config["SECRET_KEY"] = "secret!"
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")  # 👈 changed from eventlet
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")  # 👈 changed from eventlet
 
 users = {}
 messages = []
@@ -19,7 +19,7 @@ def index():
 @socketio.on("join")
 def handle_join(data):
     username = data.get("username")
-    pfp = data.get("pfp", "/static/default.png")
+    pfp = data.get("pfp", "https://cdn-icons-png.flaticon.com/512/149/149071.png")
     users[request.sid] = {"username": username, "pfp": pfp}
 
     emit("user_joined", {"username": username}, broadcast=True)
@@ -27,7 +27,7 @@ def handle_join(data):
 
 @socketio.on("send_message")
 def handle_message(data):
-    user = users.get(request.sid, {"username": "Anonymous", "pfp": "/static/default.png"})
+    user = users.get(request.sid, {"username": "Anonymous", "pfp": "https://cdn-icons-png.flaticon.com/512/149/149071.png"})
     message = {
         "username": user["username"],
         "pfp": user["pfp"],
@@ -60,4 +60,5 @@ def handle_disconnect():
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
+
 
