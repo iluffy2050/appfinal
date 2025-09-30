@@ -4,8 +4,8 @@ from flask_socketio import SocketIO, emit
 app = Flask(__name__, template_folder=".")
 app.config["SECRET_KEY"] = "secret!"
 
-# Use Gevent instead of Eventlet
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="gevent")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+
 
 users = {}
 messages = []
@@ -53,3 +53,4 @@ def handle_disconnect():
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
+
